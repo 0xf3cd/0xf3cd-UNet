@@ -37,3 +37,11 @@ def diff_mask(ref_image, mask_image):
     ret = cv2.addWeighted(ref_image, 0.7, mask, 0.3, 0)
 
     return ret
+
+def adjust_data(img,mask):
+    img = img / 255
+    mask = mask / 255
+    mask[mask > 0.5] = 1
+    mask[mask <= 0.5] = 0
+    
+    return (img, mask)

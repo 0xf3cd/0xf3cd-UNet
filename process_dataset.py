@@ -6,6 +6,7 @@ from tqdm import tqdm
 from process_pic import *
 
 # From https://www.kaggle.com/eduardomineo/u-net-lung-segmentation-montgomery-shenzhen
+# these paths are also used in main.py
 INPUT_DIR = os.path.join(".", "input")
 
 SEGMENTATION_DIR = os.path.join(INPUT_DIR, "segmentation")
@@ -15,18 +16,16 @@ SEGMENTATION_AUG_DIR = os.path.join(SEGMENTATION_TRAIN_DIR, "augmentation")
 SEGMENTATION_IMAGE_DIR = os.path.join(SEGMENTATION_TRAIN_DIR, "image")
 SEGMENTATION_MASK_DIR = os.path.join(SEGMENTATION_TRAIN_DIR, "mask")
 SEGMENTATION_DILATE_DIR = os.path.join(SEGMENTATION_TRAIN_DIR, "dilate")
-SEGMENTATION_SOURCE_DIR = os.path.join(INPUT_DIR,                                        "pulmonary-chest-xray-abnormalities")
+SEGMENTATION_SOURCE_DIR = os.path.join(INPUT_DIR, "pulmonary-chest-xray-abnormalities")
 
-# SHENZHEN_TRAIN_DIR = os.path.join(SEGMENTATION_SOURCE_DIR, "ChinaSet_AllFiles", \
-#                                   "ChinaSet_AllFiles")
 SHENZHEN_TRAIN_DIR = os.path.join(SEGMENTATION_SOURCE_DIR, "ChinaSet_AllFiles")
 SHENZHEN_IMAGE_DIR = os.path.join(SHENZHEN_TRAIN_DIR, "CXR_png")
 SHENZHEN_MASK_DIR = os.path.join(INPUT_DIR, "shcxr-lung-mask", "mask", "mask")
 
-MONTGOMERY_TRAIN_DIR = os.path.join(SEGMENTATION_SOURCE_DIR,                                     "Montgomery", "MontgomerySet")
+MONTGOMERY_TRAIN_DIR = os.path.join(SEGMENTATION_SOURCE_DIR, "Montgomery", "MontgomerySet")
 MONTGOMERY_IMAGE_DIR = os.path.join(MONTGOMERY_TRAIN_DIR, "CXR_png")
-MONTGOMERY_LEFT_MASK_DIR = os.path.join(MONTGOMERY_TRAIN_DIR,                                         "ManualMask", "leftMask")
-MONTGOMERY_RIGHT_MASK_DIR = os.path.join(MONTGOMERY_TRAIN_DIR,                                          "ManualMask", "rightMask")
+MONTGOMERY_LEFT_MASK_DIR = os.path.join(MONTGOMERY_TRAIN_DIR, "ManualMask", "leftMask")
+MONTGOMERY_RIGHT_MASK_DIR = os.path.join(MONTGOMERY_TRAIN_DIR, "ManualMask", "rightMask")
 
 DILATE_KERNEL = np.ones((15, 15), np.uint8)
 
