@@ -35,8 +35,8 @@
     │       ├── image
     │       └── mask
     └── shcxr-lung-mask
-    └── mask
-    └── mask
+        └── mask
+            └── mask
     ```
 
 * References
