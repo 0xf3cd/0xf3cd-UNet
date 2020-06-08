@@ -43,7 +43,7 @@ train_generator_args = dict(rotation_range=0.2,
                             horizontal_flip=True,
                             fill_mode='nearest')
 
-train_gen = train_generator(batch_size,
+train_gen = train_generator(2,
                             SEGMENTATION_TRAIN_DIR,
                             'image',
                             'dilate', 
@@ -52,17 +52,37 @@ train_gen = train_generator(batch_size,
                             save_to_dir=os.path.abspath(SEGMENTATION_AUG_DIR))
 
 validation_data = (test_load_image(test_files[0], target_size=(pic_size, pic_size)),
-                test_load_image(add_suffix(test_files[0], "dilate"), target_size=(pic_size, pic_size)))
+                   test_load_image(add_suffix(test_files[0], "dilate"), target_size=(pic_size, pic_size)))
 
-model = octave_attention_unet(input_size=(pic_size,pic_size,1), init_filters=init_filters, 
-                                activation='relu', padding='same', 
-                                dropout_rate=0.3, perf_BN=False, 
-                                data_format='channels_last', final_act='sigmoid',
-                                attention_act='sigmoid', use_attention=True)
+
+# model = origin_unet(input_size=(512, 512, 1))
+# model.compile(optimizer=Adam(lr=init_learning_rate, clipnorm=1.), \
+#                              loss=dice_coef_loss, \
+#                              metrics=[dice_coef, 'binary_accuracy'])
+# model.summary()
+# model.fit_generator(train_gen,
+#                     steps_per_epoch=steps_per_epoch, 
+#                     epochs=2, 
+#                     validation_data = validation_data)
+
+
+model = my_test_unet(input_size=(pic_size,pic_size,1), init_filters=init_filters, 
+                    activation='relu', padding='same', 
+                    dropout_rate=0.3, perf_BN=False, 
+                    data_format='channels_last', final_act='sigmoid',
+                    attention_act='sigmoid', use_attention=True)
 model.compile(optimizer=Adam(lr=init_learning_rate, clipnorm=1.), \
                              loss=dice_coef_loss, \
                              metrics=[dice_coef, 'binary_accuracy'])
 model.summary()
+
+history = model.fit_generator(train_gen,
+                              steps_per_epoch=steps_per_epoch, 
+                              epochs=epochs, 
+                              validation_data = validation_data)
+os._exit(0)
+
+
 
 save_fdir = './octatt_unet_64'+time.strftime('%Y-%m-%d-%h-%s',time.localtime(time.time()))+'/'
 if not os.path.exists(save_fdir):

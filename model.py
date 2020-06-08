@@ -314,7 +314,6 @@ def octconv_block(ip_high, ip_low, filters, kernel_size=(3, 3), strides=(1, 1),
 
     return x_high, x_low
 
-
 def my_Conv2D(prev_layer, origin_arg, 
               activation='relu', padding='same', 
               dropout_rate=0.0, perf_BN=False):
@@ -328,104 +327,101 @@ def my_Conv2D(prev_layer, origin_arg,
 
 
 # Definition of the model
-def octave_attention_unet(input_size=(256,256,1), init_filters=32, 
+def origin_unet(input_size=(256,256,1)):
+    inputs = Input(input_size)
+    
+    conv1 = Conv2D(32, (3, 3), activation='relu', padding='same')(inputs)
+    conv1 = Conv2D(32, (3, 3), activation='relu', padding='same')(conv1)
+    pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
+
+    conv2 = Conv2D(64, (3, 3), activation='relu', padding='same')(pool1)
+    conv2 = Conv2D(64, (3, 3), activation='relu', padding='same')(conv2)
+    pool2 = MaxPooling2D(pool_size=(2, 2))(conv2)
+
+    conv3 = Conv2D(128, (3, 3), activation='relu', padding='same')(pool2)
+    conv3 = Conv2D(128, (3, 3), activation='relu', padding='same')(conv3)
+    pool3 = MaxPooling2D(pool_size=(2, 2))(conv3)
+
+    conv4 = Conv2D(256, (3, 3), activation='relu', padding='same')(pool3)
+    conv4 = Conv2D(256, (3, 3), activation='relu', padding='same')(conv4)
+    pool4 = MaxPooling2D(pool_size=(2, 2))(conv4)
+
+    conv5 = Conv2D(512, (3, 3), activation='relu', padding='same')(pool4)
+    conv5 = Conv2D(512, (3, 3), activation='relu', padding='same')(conv5)
+
+    up6 = concatenate([Conv2DTranspose(256, (2, 2), strides=(2, 2), padding='same')(conv5), conv4], axis=3)
+    conv6 = Conv2D(256, (3, 3), activation='relu', padding='same')(up6)
+    conv6 = Conv2D(256, (3, 3), activation='relu', padding='same')(conv6)
+
+    up7 = concatenate([Conv2DTranspose(128, (2, 2), strides=(2, 2), padding='same')(conv6), conv3], axis=3)
+    conv7 = Conv2D(128, (3, 3), activation='relu', padding='same')(up7)
+    conv7 = Conv2D(128, (3, 3), activation='relu', padding='same')(conv7)
+
+    up8 = concatenate([Conv2DTranspose(64, (2, 2), strides=(2, 2), padding='same')(conv7), conv2], axis=3)
+    conv8 = Conv2D(64, (3, 3), activation='relu', padding='same')(up8)
+    conv8 = Conv2D(64, (3, 3), activation='relu', padding='same')(conv8)
+
+    up9 = concatenate([Conv2DTranspose(32, (2, 2), strides=(2, 2), padding='same')(conv8), conv1], axis=3)
+    conv9 = Conv2D(32, (3, 3), activation='relu', padding='same')(up9)
+    conv9 = Conv2D(32, (3, 3), activation='relu', padding='same')(conv9)
+
+    conv10 = Conv2D(1, (1, 1), activation='sigmoid')(conv9)
+
+    return Model(inputs=[inputs], outputs=[conv10])
+
+def my_test_unet(input_size=(256,256,1), init_filters=32, 
                             activation='relu', padding='same', 
                             dropout_rate=0.0, perf_BN=False, 
                             data_format='channels_last', final_act='sigmoid', 
                             attention_act='sigmoid', use_attention=True):
     inputs = Input(input_size)
     filters = init_filters
-    
-    conv1 = inputs
-    conv1 = my_Conv2D(conv1, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-    conv1 = my_Conv2D(conv1, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-    pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
-    filters *= 2
-    
-    conv2 = my_Conv2D(pool1, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-    conv2 = my_Conv2D(conv2, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-    pool2 = MaxPooling2D(pool_size=(2, 2))(conv2)
-    filters *= 2 
-    
-    conv3 = my_Conv2D(pool2, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-    conv3 = my_Conv2D(conv3, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-    pool3 = MaxPooling2D(pool_size=(2, 2))(conv3)
-    filters *= 2
-    
-    conv4 = my_Conv2D(pool3, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-    conv4 = my_Conv2D(conv4, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-    pool4 = MaxPooling2D(pool_size=(2, 2))(conv4)
-    filters *= 2
+    depth = 4
+    convs = []
+    pools = [inputs]
 
-    xh5, xl5 = initial_octconv(pool4, filters=filters)
+    # Down-sampling
+    for i in range(depth):
+        prev_layer = pools[-1]
+        new_conv = my_Conv2D(prev_layer, (filters, (3, 3)), 
+                             activation=activation, padding=padding,
+                             dropout_rate=dropout_rate, perf_BN=perf_BN)
+        new_conv = my_Conv2D(new_conv, (filters, (3, 3)), 
+                             activation=activation, padding=padding,
+                             dropout_rate=dropout_rate, perf_BN=perf_BN)
+        convs.append(new_conv)
+        new_pool = MaxPooling2D(pool_size=(2, 2))(new_conv)
+        pools.append(new_pool)
+        filters *= 2
+    
+    # Bottleneck - the bottom of U-Net
+    prev_layer = pools[-1]
+    xh5, xl5 = initial_octconv(prev_layer, filters=filters)
     xh5, xl5 = octconv_block(xh5, xl5, filters=int(filters*1.5))
-    conv5 = final_octconv(xh5, xl5, filters=filters)
-    filters //= 2
-    
-    if use_attention:  
-        up6 = attention_up_and_concate(conv5, conv4, activation=attention_act, data_format=data_format)
-    else:
-        up6 = concatenate([Conv2DTranspose(filters, (2, 2), strides=(2, 2), padding='same')(conv5), conv4], axis=3)
-    conv6 = my_Conv2D(up6, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-    conv6 = my_Conv2D(conv6, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
+    conv_bottleneck = final_octconv(xh5, xl5, filters=filters)
+    convs.append(conv_bottleneck)
     filters //= 2
 
-    if use_attention:
-        up7 = attention_up_and_concate(conv6, conv3, activation=attention_act, data_format=data_format)
-    else:
-        up7 = concatenate([Conv2DTranspose(filters, (2, 2), strides=(2, 2), padding='same')(conv6), conv3], axis=3)
-    conv7 = my_Conv2D(up7, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-    conv7 = my_Conv2D(conv7, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-    filters //= 2
-    
+    # Up-sampling
+    for i in range(depth):
+        last_conv = convs[-1]
+        to_concat_conv = convs[depth-1-i]
+        print(last_conv.shape)
+        print(to_concat_conv.shape)
+        if use_attention:  
+            up = attention_up_and_concate(last_conv, to_concat_conv, activation=attention_act, data_format=data_format)
+        else:
+            up = concatenate([Conv2DTranspose(filters, (2, 2), strides=(2, 2), padding='same')(last_conv), to_concat_conv], axis=3)
+        new_conv = my_Conv2D(up, (filters, (3, 3)), 
+                             activation=activation, padding=padding,
+                             dropout_rate=dropout_rate, perf_BN=perf_BN)
+        new_conv = my_Conv2D(new_conv, (filters, (3, 3)), 
+                             activation=activation, padding=padding,
+                             dropout_rate=dropout_rate, perf_BN=perf_BN)
+        convs.append(new_conv)
+        # new_pool = MaxPooling2D(pool_size=(2, 2))(new_conv)
+        # layers.append(new_pool)
+        filters //= 2
 
-    if use_attention:  
-        up8 = attention_up_and_concate(conv7, conv2, activation=attention_act, data_format=data_format)
-    else:
-        up8 = concatenate([Conv2DTranspose(filters, (2, 2), strides=(2, 2), padding='same')(conv7), conv2], axis=3)
-    conv8 = my_Conv2D(up8, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-    conv8 = my_Conv2D(conv8, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-    filters //= 2
-    
-    if use_attention:  
-        up9 = attention_up_and_concate(conv8, conv1, activation=attention_act, data_format=data_format)
-    else:
-        up9 = concatenate([Conv2DTranspose(filters, (2, 2), strides=(2, 2), padding='same')(conv8), conv1], axis=3)
-    conv9 = my_Conv2D(up9, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-    conv9 = my_Conv2D(conv9, (filters, (3, 3)), 
-                      activation=activation, padding=padding,
-                      dropout_rate=dropout_rate, perf_BN=perf_BN)
-
-    conv10 = Conv2D(1, (1, 1), activation=final_act)(conv9)
-    return Model(inputs=[inputs], outputs=[conv10])
-
+    conv_last = Conv2D(1, (1, 1), activation=final_act)(convs[-1])
+    return Model(inputs=[inputs], outputs=[conv_last])
