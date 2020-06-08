@@ -1,16 +1,19 @@
 import os
 import numpy as np
 import cv2
-from keras.models import *
-from keras.layers import *
-from keras.optimizers import *
-from keras import backend as keras
-from keras.preprocessing.image import ImageDataGenerator
-from keras.callbacks import ModelCheckpoint, LearningRateScheduler, EarlyStopping
+from tensorflow.keras.models import *
+from tensorflow.keras.layers import *
+from tensorflow.keras.optimizers import *
+from tensorflow.keras import backend as keras
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.callbacks import ModelCheckpoint, LearningRateScheduler, EarlyStopping
 import tensorflow as tf
 from glob import glob
 from process_pic import adjust_data
 from load_save_pic import test_load_image, save_result, add_suffix
+import tensorflow_addons as tfa
+from tensorflow.keras import backend as K
+
 
 # Loss Function
 # From: https://github.com/jocicmarko/ultrasound-nerve-segmentation/blob/master/train.py
@@ -316,10 +319,16 @@ def octconv_block(ip_high, ip_low, filters, kernel_size=(3, 3), strides=(1, 1),
 
 def my_Conv2D(prev_layer, origin_arg, 
               activation='relu', padding='same', 
-              dropout_rate=0.0, perf_BN=False):
+              dropout_rate=0.0, perf_BN=False, perf_IN=False):
     new_layer = Conv2D(*origin_arg, activation=activation, padding=padding)(prev_layer)
     if dropout_rate > 0.0:
         new_layer = Dropout(dropout_rate)(new_layer)
+    if perf_IN:
+        new_layer = tfa.layers.InstanceNormalization(axis=3, 
+                                                     center=True, 
+                                                     scale=True,
+                                                     beta_initializer="random_uniform",
+                                                     gamma_initializer="random_uniform")(new_layer)
     if perf_BN:
         new_layer = BatchNormalization()(new_layer)
     return new_layer
@@ -369,11 +378,12 @@ def origin_unet(input_size=(256,256,1)):
 
     return Model(inputs=[inputs], outputs=[conv10])
 
-def my_test_unet(input_size=(256,256,1), init_filters=32, 
-                            activation='relu', padding='same', 
-                            dropout_rate=0.0, perf_BN=False, 
-                            data_format='channels_last', final_act='sigmoid', 
-                            attention_act='sigmoid', use_attention=True):
+
+def oct_att_unet(input_size=(256,256,1), init_filters=32, 
+                 activation='relu', padding='same', 
+                 dropout_rate=0.0, perf_BN=False, 
+                 data_format='channels_last', final_act='sigmoid', 
+                 attention_act='sigmoid', use_attention=True):
     inputs = Input(input_size)
     filters = init_filters
     depth = 4
@@ -385,14 +395,16 @@ def my_test_unet(input_size=(256,256,1), init_filters=32,
         prev_layer = pools[-1]
         new_conv = my_Conv2D(prev_layer, (filters, (3, 3)), 
                              activation=activation, padding=padding,
-                             dropout_rate=dropout_rate, perf_BN=perf_BN)
+                             dropout_rate=dropout_rate, perf_BN=perf_BN, perf_IN=False)
         new_conv = my_Conv2D(new_conv, (filters, (3, 3)), 
                              activation=activation, padding=padding,
-                             dropout_rate=dropout_rate, perf_BN=perf_BN)
+                             dropout_rate=dropout_rate, perf_BN=perf_BN, perf_IN=False)
         convs.append(new_conv)
         new_pool = MaxPooling2D(pool_size=(2, 2))(new_conv)
         pools.append(new_pool)
         filters *= 2
+
+        # concatenate([, ], axis=3)
     
     # Bottleneck - the bottom of U-Net
     prev_layer = pools[-1]
@@ -406,18 +418,79 @@ def my_test_unet(input_size=(256,256,1), init_filters=32,
     for i in range(depth):
         last_conv = convs[-1]
         to_concat_conv = convs[depth-1-i]
-        print(last_conv.shape)
-        print(to_concat_conv.shape)
         if use_attention:  
             up = attention_up_and_concate(last_conv, to_concat_conv, activation=attention_act, data_format=data_format)
         else:
             up = concatenate([Conv2DTranspose(filters, (2, 2), strides=(2, 2), padding='same')(last_conv), to_concat_conv], axis=3)
         new_conv = my_Conv2D(up, (filters, (3, 3)), 
                              activation=activation, padding=padding,
-                             dropout_rate=dropout_rate, perf_BN=perf_BN)
+                             dropout_rate=dropout_rate, perf_BN=perf_BN, perf_IN=False)
         new_conv = my_Conv2D(new_conv, (filters, (3, 3)), 
                              activation=activation, padding=padding,
-                             dropout_rate=dropout_rate, perf_BN=perf_BN)
+                             dropout_rate=dropout_rate, perf_BN=perf_BN, perf_IN=False)
+        convs.append(new_conv)
+        # new_pool = MaxPooling2D(pool_size=(2, 2))(new_conv)
+        # layers.append(new_pool)
+        filters //= 2
+
+    conv_last = Conv2D(1, (1, 1), activation=final_act)(convs[-1])
+    return Model(inputs=[inputs], outputs=[conv_last])
+
+
+
+def oct_att_IN_unet(input_size=(256,256,1), init_filters=32, 
+                            activation='relu', padding='same', 
+                            dropout_rate=0.0,
+                            data_format='channels_last', final_act='sigmoid', 
+                            attention_act='sigmoid', use_attention=True):
+    inputs = Input(input_size)
+    filters = init_filters
+    depth = 4
+    convs = []
+    pools = [inputs]
+
+    # Down-sampling
+    for i in range(depth):
+        prev_layer = pools[-1]
+        new_conv_1 = my_Conv2D(prev_layer, (filters//2, (3, 3)), 
+                             activation=activation, padding=padding,
+                             dropout_rate=dropout_rate, perf_BN=True, perf_IN=False)
+        new_conv_2 = my_Conv2D(prev_layer, (filters//2, (3, 3)), 
+                             activation=activation, padding=padding,
+                             dropout_rate=dropout_rate, perf_BN=False, perf_IN=False)
+        new_conv = concatenate([new_conv_1, new_conv_2], axis=3)
+        new_conv = my_Conv2D(new_conv, (filters, (3, 3)),
+                             activation=activation, padding=padding,
+                             dropout_rate=dropout_rate, perf_BN=False, perf_IN=False)
+        convs.append(new_conv)
+        new_pool = MaxPooling2D(pool_size=(2, 2))(new_conv)
+        pools.append(new_pool)
+        filters *= 2
+
+        # concatenate([, ], axis=3)
+    
+    # Bottleneck - the bottom of U-Net
+    prev_layer = pools[-1]
+    xh5, xl5 = initial_octconv(prev_layer, filters=filters)
+    xh5, xl5 = octconv_block(xh5, xl5, filters=int(filters*1.5))
+    conv_bottleneck = final_octconv(xh5, xl5, filters=filters)
+    convs.append(conv_bottleneck)
+    filters //= 2
+
+    # Up-sampling
+    for i in range(depth):
+        last_conv = convs[-1]
+        to_concat_conv = convs[depth-1-i]
+        if use_attention:  
+            up = attention_up_and_concate(last_conv, to_concat_conv, activation=attention_act, data_format=data_format)
+        else:
+            up = concatenate([Conv2DTranspose(filters, (2, 2), strides=(2, 2), padding='same')(last_conv), to_concat_conv], axis=3)
+        new_conv = my_Conv2D(up, (filters, (3, 3)), 
+                             activation=activation, padding=padding,
+                             dropout_rate=dropout_rate, perf_BN=False, perf_IN=False)
+        new_conv = my_Conv2D(new_conv, (filters, (3, 3)), 
+                             activation=activation, padding=padding,
+                             dropout_rate=dropout_rate, perf_BN=False, perf_IN=False)
         convs.append(new_conv)
         # new_pool = MaxPooling2D(pool_size=(2, 2))(new_conv)
         # layers.append(new_pool)
