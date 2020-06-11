@@ -26,6 +26,16 @@ def dice_coef(y_true, y_pred):
 def dice_coef_loss(y_true, y_pred):
     return -dice_coef(y_true, y_pred)
 
+def mean_iou(y_true, y_pred):
+    y_true_f = keras.flatten(y_true)
+    y_pred_f = keras.flatten(y_pred)
+    intersection = K.sum(K.abs(y_true_f * y_pred_f), axis=-1)
+    union = K.sum(y_true_f + y_pred_f) - intersection
+    return ((intersection + K.epsilon()) / (union + K.epsilon()))
+
+def mean_iou_loss(y_true, y_pred):
+    return -mean_iou(y_true, y_pred)
+
 
 # use ImageDataGenerator in Keras to generate more data
 # From: https://github.com/zhixuhao/unet/blob/master/data.py
@@ -454,14 +464,14 @@ def oct_att_IN_unet(input_size=(256,256,1), init_filters=32,
         prev_layer = pools[-1]
         new_conv_1 = my_Conv2D(prev_layer, (filters//2, (3, 3)), 
                              activation=activation, padding=padding,
-                             dropout_rate=dropout_rate, perf_BN=True, perf_IN=False)
+                             dropout_rate=dropout_rate, perf_BN=False, perf_IN=False)
         new_conv_2 = my_Conv2D(prev_layer, (filters//2, (3, 3)), 
                              activation=activation, padding=padding,
                              dropout_rate=dropout_rate, perf_BN=False, perf_IN=False)
         new_conv = concatenate([new_conv_1, new_conv_2], axis=3)
         new_conv = my_Conv2D(new_conv, (filters, (3, 3)),
                              activation=activation, padding=padding,
-                             dropout_rate=dropout_rate, perf_BN=False, perf_IN=False)
+                             dropout_rate=dropout_rate, perf_BN=False, perf_IN=True)
         convs.append(new_conv)
         new_pool = MaxPooling2D(pool_size=(2, 2))(new_conv)
         pools.append(new_pool)
