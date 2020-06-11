@@ -10,12 +10,12 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-from keras.models import *
-from keras.layers import *
-from keras.optimizers import *
-from keras import backend as keras
-from keras.preprocessing.image import ImageDataGenerator
-from keras.callbacks import ModelCheckpoint, LearningRateScheduler, EarlyStopping
+from tensorflow.keras.models import *
+from tensorflow.keras.layers import *
+from tensorflow.keras.optimizers import *
+from tensorflow.keras import backend as keras
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.callbacks import ModelCheckpoint, LearningRateScheduler, EarlyStopping
 import tensorflow as tf
 
 from glob import glob
@@ -260,11 +260,12 @@ test_files = [test_file for test_file in glob(os.path.join('./test/', "*.png")) 
 
 
 def load_trained_model(mdir, show_summary=True):
-    h5_dir = os.path.join(mdir, 'model.h5')
-    model = load_model(h5_dir, compile=False)
+    h5_dir = os.path.join(mdir, 'unet_64.hdf5')
+    model = load_model(h5_dir, custom_objects={"tf": tf}, compile=False)
+#     model = load_model(h5_dir, custom_objects={"tf": tf})
     if show_summary:
         model.summary()
-    model.compile(optimizer=Adam(lr=init_learning_rate, clipnorm=1.), loss=dice_coef_loss,                       metrics=[dice_coef, 'binary_accuracy'])
+    model.compile(optimizer=Adam(lr=init_learning_rate, clipnorm=1.), loss=mean_iou_loss, metrics=[dice_coef, mean_iou, 'binary_accuracy'])
     return model
 
 
