@@ -43,7 +43,7 @@ train_generator_args = dict(rotation_range=0.2,
                             horizontal_flip=True,
                             fill_mode='nearest')
 
-train_gen = train_generator(batch_size,
+train_gen = train_generator(2,
                             SEGMENTATION_TRAIN_DIR,
                             'image',
                             'dilate', 
@@ -52,19 +52,24 @@ train_gen = train_generator(batch_size,
                             save_to_dir=os.path.abspath(SEGMENTATION_AUG_DIR))
 
 validation_data = (test_load_image(test_files[0], target_size=(pic_size, pic_size)),
-                test_load_image(add_suffix(test_files[0], "dilate"), target_size=(pic_size, pic_size)))
+                   test_load_image(add_suffix(test_files[0], "dilate"), target_size=(pic_size, pic_size)))
 
-model = octave_attention_unet(input_size=(pic_size,pic_size,1), init_filters=init_filters, 
-                                activation='relu', padding='same', 
-                                dropout_rate=0.3, perf_BN=False, 
-                                data_format='channels_last', final_act='sigmoid',
-                                attention_act='sigmoid', use_attention=True)
+model = oct_att_IN_unet(input_size=(pic_size,pic_size,1), init_filters=init_filters, 
+                activation='relu', padding='same', 
+                dropout_rate=0.3,
+                data_format='channels_last', final_act='sigmoid',
+                attention_act='sigmoid', use_attention=True)
+# model = oct_att_unet(input_size=(pic_size,pic_size,1), init_filters=init_filters, 
+#                 activation='relu', padding='same', 
+#                 dropout_rate=0.3, perf_BN=False,
+#                 data_format='channels_last', final_act='sigmoid',
+#                 attention_act='sigmoid', use_attention=True)
 model.compile(optimizer=Adam(lr=init_learning_rate, clipnorm=1.), \
                              loss=dice_coef_loss, \
                              metrics=[dice_coef, 'binary_accuracy'])
 model.summary()
 
-save_fdir = './octatt_unet_64'+time.strftime('%Y-%m-%d-%h-%s',time.localtime(time.time()))+'/'
+save_fdir = './unet_64'+time.strftime('%Y-%m-%d-%h-%s',time.localtime(time.time()))+'/'
 if not os.path.exists(save_fdir):
     os.makedirs(save_fdir)
     
@@ -96,13 +101,12 @@ class TrainRec(tf.keras.callbacks.Callback):
         self.count += 1
 train_rec = TrainRec()
 
-octave_attention_unet_history = model.fit_generator(train_gen,
-                                steps_per_epoch=steps_per_epoch, 
-                                epochs=epochs, 
-                                callbacks=[early_stopping, model_checkpoint, train_rec],
-                                validation_data = validation_data)
+history = model.fit(train_gen,
+                    steps_per_epoch=steps_per_epoch, 
+                    epochs=epochs, 
+                    callbacks=[early_stopping, model_checkpoint, train_rec],
+                    validation_data = validation_data)
 
-history = octave_attention_unet_history
 np.save(save_fdir+'training_loss', history.history['loss'])
 np.save(save_fdir+'validation_loss', history.history['val_loss'])
 np.save(save_fdir+'dice_coef', history.history['dice_coef'])
