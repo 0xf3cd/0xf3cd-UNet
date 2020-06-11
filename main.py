@@ -23,9 +23,9 @@ dilate_files = glob(os.path.join(SEGMENTATION_DILATE_DIR, "*.png"))
 
 print(len(train_files),  len(test_files),  len(mask_files),  len(dilate_files))
 
-pic_size = 512 # unchange
-init_learning_rate = 1e-5 # unchange
-init_filters = 64 # unchange
+pic_size = 512 
+init_learning_rate = 1e-5 
+init_filters = 64 
 epochs = 512 
 steps_per_epoch = 16
 batch_size = steps_per_epoch
@@ -119,7 +119,3 @@ np.save(save_fdir+'validation_accuracy', history.history['val_binary_accuracy'])
 
 model.save(save_fdir+'model.h5')
 model.save_weights(save_fdir+'model_weights.h5')
-
-# TODO: Now, if the model is run directly, then Keras will raise an error called keras_scratch_graph.
-# If the original U-Net is previously run, then the octave_attention_unet can be run correctly.
-# There might be something wrong with the structure of the network oe the train_generator, which needs to be fixed
