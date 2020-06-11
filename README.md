@@ -39,6 +39,18 @@
             └── mask
     ```
 
+* Train the model
+    * Requirements
+        * Tensorflow v2
+        * Tensorflow-addons
+        * Keras
+    * How to run
+        * `python main.py`
+        * The process of the training and the final model will be saved in a folder starting with "octatt" (you can change the name in `main.py`)
+        
+* Load trained model and visualize it
+    * See `visualize.py` and `visualize_trained_model.ipynb`
+
 * References
     * https://www.kaggle.com/eduardomineo/u-net-lung-segmentation-montgomery-shenzhen
     * https://github.com/zhixuhao/unet/
